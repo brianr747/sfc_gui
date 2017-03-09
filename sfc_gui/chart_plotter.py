@@ -140,28 +140,19 @@ class ChartPlotterWindow2(tk.Tk):
         """
         tk.Tk.__init__(self, parent)
         self.Parent = parent
-        self.CanvasFigure = None
-        self.Line = None
-        self.Canvas = None
         self.Model = mod
-        self.TimeSeriesList = []
-        self.Pos = 0
         self.EquationString = StringVar()
         self.DescriptionString = StringVar()
-        self.SetUp()
-
-    def SetUp(self):
         self.TimeSeriesList = sfc_gui.utils.sort_series(
             list(self.Model.EquationSolver.TimeSeries.keys()))
         self.SeriesBoxValue = StringVar()
         content = ttk.Frame(self)
         frame = ttk.Frame(content, borderwidth=5, relief='sunken')
-        self.BoxWidget = ttk.Combobox(content, textvariable=self.SeriesBoxValue)
-        self.BoxWidget.state(['readonly',])
-        self.BoxWidget['values'] = self.TimeSeriesList
-        # self.SeriesBoxValue.trace('w', self.ComboChange())
+        self.SeriesBoxValue = StringVar(value=self.TimeSeriesList)
+        self.BoxWidget = tk.Listbox(content, listvariable=self.SeriesBoxValue, height=30)
+        #self.BoxWidget.state(['readonly',])
         self.BoxWidget.bind('<<ComboboxSelected>>', self.ComboChange)
-        self.BoxWidget.current(0)
+        #self.BoxWidget.current(0)
         button = tk.Button(content, text='Next',
                            command=self.OnButtonClick)
         button2 = tk.Button(content, text='Quit',
@@ -179,12 +170,12 @@ class ChartPlotterWindow2(tk.Tk):
         self.OnButtonClick()
         content.grid(column=0, row=0)
         frame.grid(column=0, row=0, columnspan=7, rowspan=3)
-        self.BoxWidget.grid(row=0, column=0, columnspan=2)
+        self.BoxWidget.grid(row=0, column=0, columnspan=2, rowspan=3, sticky=['n','w','e'])
         button.grid(column=5, row=0)
         button2.grid(column=6, row=0)
         self.EntryDescription.grid(row=0, column=2, columnspan=3, sticky=['w','e'])
-        self.Equation.grid(row=1, column=0, columnspan=7, sticky=['w', 'e'])
-        self.Canvas.get_tk_widget().grid(column=0, row=2, columnspan=7, sticky=['n', 's', 'e', 'w'])
+        self.Equation.grid(row=1, column=2, columnspan=5, sticky=['w', 'e'])
+        self.Canvas.get_tk_widget().grid(column=3, row=2, columnspan=5, sticky=['n', 's', 'e', 'w'])
         content.columnconfigure(2, weight=1)
         content.columnconfigure(3, weight=1)
         content.columnconfigure(4, weight=1)
@@ -198,7 +189,12 @@ class ChartPlotterWindow2(tk.Tk):
 
     def OnButtonClick(self):
         x = self.Model.GetTimeSeries('k')
-        series_name = self.BoxWidget.get()
+        idx = self.BoxWidget.curselection()
+        if len(idx) == 0:
+            idx = 0
+        else:
+            idx = idx[0]
+        series_name = self.TimeSeriesList[idx]
         desc = ''
         eqn = ''
         try:
