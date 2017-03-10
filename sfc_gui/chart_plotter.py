@@ -132,7 +132,7 @@ class ChartPlotterWindow(tk.Tk):
 # Yes, I should not be duplicating the code; I just want to mess around with various GUI options.
 # This sucker will be rebuilt from scratch once I understand how tkinter works.
 class ChartPlotterWindow2(tk.Tk):
-    def __init__(self, parent, mod):
+    def __init__(self, parent, mod, time_cut_off=None):
         """
 
         :param parent:
@@ -141,6 +141,7 @@ class ChartPlotterWindow2(tk.Tk):
         tk.Tk.__init__(self, parent)
         self.Parent = parent
         self.Model = mod
+        self.TimeCutOff = time_cut_off
         self.EquationString = StringVar()
         self.DescriptionString = StringVar()
         self.TimeSeriesList = sfc_gui.utils.sort_series(
@@ -151,9 +152,9 @@ class ChartPlotterWindow2(tk.Tk):
         self.SeriesBoxValue = StringVar(value=self.TimeSeriesList)
         self.BoxWidget = tk.Listbox(content, listvariable=self.SeriesBoxValue, height=30)
         #self.BoxWidget.state(['readonly',])
-        self.BoxWidget.bind('<<ComboboxSelected>>', self.ComboChange)
+        self.BoxWidget.bind('<<ListboxSelect>>', self.ComboChange)
         #self.BoxWidget.current(0)
-        button = tk.Button(content, text='Next',
+        button = tk.Button(content, text='<test>',
                            command=self.OnButtonClick)
         button2 = tk.Button(content, text='Quit',
                            command=self.quit)
@@ -188,13 +189,17 @@ class ChartPlotterWindow2(tk.Tk):
         self.OnButtonClick()
 
     def OnButtonClick(self):
-        x = self.Model.GetTimeSeries('k')
+        x = self.Model.GetTimeSeries('k', self.TimeCutOff)
         idx = self.BoxWidget.curselection()
         if len(idx) == 0:
             idx = 0
         else:
             idx = idx[0]
         series_name = self.TimeSeriesList[idx]
+        try:
+            y = self.Model.GetTimeSeries(series_name, self.TimeCutOff)
+        except KeyError:
+            return
         desc = ''
         eqn = ''
         try:
@@ -207,10 +212,6 @@ class ChartPlotterWindow2(tk.Tk):
             eqn_str = ''
         self.EquationString.set(eqn_str)
         self.DescriptionString.set(desc)
-        try:
-            y = self.Model.GetTimeSeries(series_name)
-        except KeyError:
-            return
         self.Line.set_data(x,y)
         # Based on stackoverflow "How do I Refresh a matplotlib plot in a Tkinter window?"
         # self.Canvas = FigureCanvasTkAgg(Fig, master=self)

@@ -7,7 +7,7 @@ builder = chapter3.SIM('CAN')
 mod = builder.build_model()
 mod.main()
 
-window = ChartPlotterWindow2(None, mod)
+window = ChartPlotterWindow2(None, mod, time_cut_off=40)
 window.mainloop()
 
 
