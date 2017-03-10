@@ -1,4 +1,4 @@
-sfc_gui: GUI For The SFC Models Package
+# coding=utf-8sfc_gui: GUI For The SFC Models Package
 =======================================
 
 Introduction

@@ -1,3 +1,4 @@
+# coding=utf-8
 import sfc_models.gl_book.chapter3 as chapter3
 from sfc_gui.chart_plotter import ChartPlotterWindow2
 
