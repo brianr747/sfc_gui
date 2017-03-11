@@ -20,7 +20,25 @@ limitations under the License.
 """
 
 import copy
+import sys
 
+if sys.version_info[0] < 3:
+    import Tkinter as tk
+    from Tkinter import *
+    from Tkinter import ttk
+else:
+    import tkinter as tk
+    from tkinter import *
+    from tkinter import ttk
+
+class WidgetHolder(object):
+    def __init__(self):
+        self.Widgets = {}
+        self.Data = {}
+
+    def AddEntry(self, parent, name):
+        self.Data[name] = StringVar()
+        self.Widgets[name] = Entry(parent, textvariable=self.Data[name])
 
 def sort_series(serlist):
     """
@@ -42,3 +60,35 @@ def sort_series(serlist):
         new_serlist.remove('k')
         new_serlist.insert(0,'k')
     return new_serlist
+
+
+def get_int(val, accept_None=True):
+    try:
+        val_n = int(val)
+    except:
+        if accept_None and val.lower() in ('none', 'na', ''):
+            val_n = None
+        else:
+            raise
+    return val_n
+
+
+def get_series_info(series_name, mod):
+    desc = ''
+    eqn = ''
+    try:
+        eq = mod.FinalEquationBlock[series_name]
+        eqn = eq.GetRightHandSide()
+        desc = eq.Description
+        eqn_str = '{0} = {1}'.format(series_name, eqn)
+    except KeyError:
+        # k is one variable that will not be in the FinalEquationBlock
+        eqn_str = ''
+    if series_name == 'k':
+        desc = '[k] Time Axis'
+        eqn_str = 'k = k (!)'
+    if eqn_str == '' and series_name == 't':
+        eqn_str = 't = k'
+        desc = '[t] Automatically generated time axis; user may override as a global equation.'
+    return eqn_str, desc
+

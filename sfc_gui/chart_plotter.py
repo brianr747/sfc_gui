@@ -26,7 +26,8 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from matplotlib.figure import Figure
 import matplotlib.pyplot
 from sfc_models.models import Model
-import sfc_gui.utils
+import sfc_gui.utils as utils
+from sfc_gui.utils import WidgetHolder
 
 if sys.version_info[0] < 3:
     import Tkinter as tk
@@ -57,7 +58,7 @@ class ChartPlotterWindow(tk.Tk):
         self.SetUp()
 
     def SetUp(self):
-        self.TimeSeriesList = sfc_gui.utils.sort_series(
+        self.TimeSeriesList = utils.sort_series(
             list(self.Model.EquationSolver.TimeSeries.keys()))
         self.SeriesBoxValue = StringVar()
         content = ttk.Frame(self)
@@ -140,22 +141,29 @@ class ChartPlotterWindow2(tk.Tk):
         :param mod: Model
         """
         tk.Tk.__init__(self, parent)
+        self.wm_title('sfc_models Chart Plotter')
         self.Parent = parent
         self.Model = mod
         self.TimeCutOff = time_cut_off
+        self.TimeStart = 0
         self.EquationString = StringVar()
         self.DescriptionString = StringVar()
-        self.TimeSeriesList = sfc_gui.utils.sort_series(
+        self.TimeSeriesList = utils.sort_series(
             list(self.Model.EquationSolver.TimeSeries.keys()))
         self.SeriesBoxValue = StringVar()
-        content = ttk.Frame(self)
-        frame = ttk.Frame(content, borderwidth=5, relief='sunken')
+        content = ttk.Frame(self, borderwidth=5, relief='sunken')
+        self.FrameContent = content
+        # Settings frame window
+        self.Settings = WidgetHolder()
+        self.FrameControls = self.CreateControlFrame(self.Settings)
+        self.SetSettings()
+
+        # frame = ttk.Frame(content, borderwidth=5, relief='sunken')
         self.SeriesBoxValue = StringVar(value=self.TimeSeriesList)
-        self.BoxWidget = tk.Listbox(content, listvariable=self.SeriesBoxValue, height=30)
-        #self.BoxWidget.state(['readonly',])
-        self.BoxWidget.bind('<<ListboxSelect>>', self.ComboChange)
-        #self.BoxWidget.current(0)
-        button = tk.Button(content, text='<test>',
+        self.WidgetListVariableNames = tk.Listbox(content, listvariable=self.SeriesBoxValue, height=30)
+        self.WidgetListVariableNames.select_set(0)
+        self.WidgetListVariableNames.bind('<<ListboxSelect>>', self.OnListEvent)
+        button = tk.Button(content, text='Settings',
                            command=self.OnButtonClick)
         button2 = tk.Button(content, text='Quit',
                            command=self.quit)
@@ -169,10 +177,8 @@ class ChartPlotterWindow2(tk.Tk):
         y = []
         self.Line, = subplot.plot(x, y, 'bo-')
         self.Canvas = FigureCanvasTkAgg(Fig, master=content)
-        self.OnButtonClick()
         content.grid(column=0, row=0)
-        frame.grid(column=0, row=0, columnspan=7, rowspan=3)
-        self.BoxWidget.grid(row=0, column=0, columnspan=2, rowspan=3, sticky=['n','w','e'])
+        self.WidgetListVariableNames.grid(row=0, column=0, columnspan=2, rowspan=3, sticky=['n', 'w', 'e'])
         button.grid(column=5, row=0)
         button2.grid(column=6, row=0)
         self.EntryDescription.grid(row=0, column=2, columnspan=3, sticky=['w','e'])
@@ -182,43 +188,101 @@ class ChartPlotterWindow2(tk.Tk):
         content.columnconfigure(3, weight=1)
         content.columnconfigure(4, weight=1)
         content.rowconfigure(2, weight=1)
+        self.UpdateContentFrame()
+        self.FrameContent.tkraise()
         self.Canvas.show()
         self.resizable(width=True, height=True)
         self.update()
 
-    def ComboChange(self, event):
-        self.OnButtonClick()
+    def CreateControlFrame(self, widgetholder):
+        frame = ttk.Frame(self, borderwidth=5, relief='sunken')
+
+        button = tk.Button(frame, text='Apply', command=self.OnSettingsApply)
+        button2 = tk.Button(frame, text='Cancel',
+                            command=self.OnSettingsBack)
+        label = tk.Label(frame, text='Time Series Range Limit [k]')
+        widgetholder.AddEntry(frame, 'cutoff')
+        label_start = tk.Label(frame, text='Time Series Start [k]')
+        widgetholder.AddEntry(frame, 'start')
+        buttonrow = 4
+        frame.grid(row=0, column=0)
+        button.grid(row=buttonrow, column=0)
+        button2.grid(row=buttonrow, column=1)
+        label.grid(row=0, column=0, columnspan=2)
+        widgetholder.Widgets['cutoff'].grid(row=1, column=0, columnspan=2)
+        label_start.grid(row=2, column=0, columnspan=2)
+        widgetholder.Widgets['start'].grid(row=3, column=0, columnspan=2)
+        return frame
+
+    def SetSettings(self):
+        self.Settings.Data['cutoff'].set(str(self.TimeCutOff))
+        self.Settings.Data['start'].set(str(self.TimeStart))
 
     def OnButtonClick(self):
-        x = self.Model.GetTimeSeries('k', self.TimeCutOff)
-        idx = self.BoxWidget.curselection()
+        self.SetSettings()
+        self.FrameControls.tkraise()
+
+    def OnSettingsBack(self):
+        self.FrameContent.tkraise()
+
+    def OnSettingsApply(self):
+        start = self.Settings.Data['start'].get()
+        try:
+            start_n = utils.get_int(start, accept_None=False)
+        except:
+            return
+        self.TimeStart = start_n
+        val = self.Settings.Data['cutoff'].get()
+        try:
+            val_n = utils.get_int(val)
+        except:
+            return
+        if val_n == 0:
+            return
+        if val_n is None:
+            self.TimeCutOff = None
+        else:
+            self.TimeCutOff = val_n + self.TimeStart
+        self.UpdateContentFrame()
+        self.FrameContent.tkraise()
+
+    def OnListEvent(self, event):
+        self.UpdateContentFrame()
+
+    def UpdateContentFrame(self):
+        # Do the cutoff inside the GUI, as we may switch to alternative
+        # time series sources.
+        x = self.Model.GetTimeSeries('k', cutoff=None)
+        idx = self.WidgetListVariableNames.curselection()
         if len(idx) == 0:
             idx = 0
         else:
             idx = idx[0]
         series_name = self.TimeSeriesList[idx]
         try:
-            y = self.Model.GetTimeSeries(series_name, self.TimeCutOff)
+            y = self.Model.GetTimeSeries(series_name, cutoff=None)
         except KeyError:
             return
         desc = ''
         eqn = ''
-        try:
-            eq = self.Model.FinalEquationBlock[series_name]
-            eqn = eq.GetRightHandSide()
-            desc = eq.Description
-            eqn_str = '{0} = {1}'.format(series_name, eqn)
-        except KeyError:
-            # k is one variable that will not be in the FinalEquationBlock
-            eqn_str = ''
+        eqn_str, desc = utils.get_series_info(series_name, self.Model)
         self.EquationString.set(eqn_str)
         self.DescriptionString.set(desc)
+        # Must process end before first, otherwise numbering is messed up.
+        if self.TimeCutOff is not None and len(x) > self.TimeCutOff:
+            x = x[0:self.TimeCutOff]
+            y = y[0:self.TimeCutOff]
+        if self.TimeStart > 0:
+            x = x[self.TimeStart:]
+            y = y[self.TimeStart:]
+
         self.Line.set_data(x,y)
         # Based on stackoverflow "How do I Refresh a matplotlib plot in a Tkinter window?"
         # self.Canvas = FigureCanvasTkAgg(Fig, master=self)
         ax = self.Canvas.figure.gca()
         ax.set_xlim(min(x), max(x))
         ax.set_ylim(min(y)-1, max(y)+1)
+        ax.set_xlabel('k')
         self.Canvas.draw()
 
 
