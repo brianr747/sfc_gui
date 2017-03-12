@@ -142,69 +142,68 @@ class ChartPlotterWindow2(tk.Tk):
         """
         tk.Tk.__init__(self, parent)
         self.wm_title('sfc_models Chart Plotter')
+        self.SourceOptions = ('Time Series', 'Initial Steady State', 'Convergence Trace')
         self.Parent = parent
         self.Model = mod
-        self.TimeCutOff = time_cut_off
-        self.TimeStart = 0
-        self.EquationString = StringVar()
-        self.DescriptionString = StringVar()
-        self.TimeSeriesList = utils.sort_series(
-            list(self.Model.EquationSolver.TimeSeries.keys()))
-        self.SeriesBoxValue = StringVar()
-        content = ttk.Frame(self, borderwidth=5, relief='sunken')
-        self.FrameContent = content
-        # Settings frame window
-        self.Settings = WidgetHolder()
-        self.FrameControls = self.CreateControlFrame(self.Settings)
+        self.TimeAxisVariable = None
+        self.TimeAxisMinimum = None
+        self.TimeRange = None
+        self.TimeStart = None
+        self.TimeSeriesList = None
+        # WidgetSettings frame window
+        self.WidgetSettings = WidgetHolder()
+        self.FrameSettings = self.CreateSettingsFrame(self.WidgetSettings)
         self.SetSettings()
-
-        # frame = ttk.Frame(content, borderwidth=5, relief='sunken')
-        self.SeriesBoxValue = StringVar(value=self.TimeSeriesList)
-        self.WidgetListVariableNames = tk.Listbox(content, listvariable=self.SeriesBoxValue, height=30)
-        self.WidgetListVariableNames.select_set(0)
-        self.WidgetListVariableNames.bind('<<ListboxSelect>>', self.OnListEvent)
-        button = tk.Button(content, text='Settings',
-                           command=self.OnButtonClick)
-        button2 = tk.Button(content, text='Quit',
-                           command=self.quit)
-
-        self.Equation = tk.Entry(content, state=['readonly'], textvariable=self.EquationString)
-        self.EntryDescription = tk.Entry(content, state=['readonly',], textvariable=self.DescriptionString)
-        self.CanvasFigure = matplotlib.pyplot.figure(1)
-        Fig = matplotlib.figure.Figure(figsize=(7.5, 5), dpi=90)
-        subplot = Fig.add_subplot(111)
-        x = []
-        y = []
-        self.Line, = subplot.plot(x, y, 'bo-')
-        self.Canvas = FigureCanvasTkAgg(Fig, master=content)
-        content.grid(column=0, row=0)
-        self.WidgetListVariableNames.grid(row=0, column=0, columnspan=2, rowspan=3, sticky=['n', 'w', 'e'])
-        button.grid(column=5, row=0)
-        button2.grid(column=6, row=0)
-        self.EntryDescription.grid(row=0, column=2, columnspan=3, sticky=['w','e'])
-        self.Equation.grid(row=1, column=2, columnspan=5, sticky=['w', 'e'])
-        self.Canvas.get_tk_widget().grid(column=3, row=2, columnspan=5, sticky=['n', 's', 'e', 'w'])
-        content.columnconfigure(2, weight=1)
-        content.columnconfigure(3, weight=1)
-        content.columnconfigure(4, weight=1)
-        content.rowconfigure(2, weight=1)
+        # Graph Frame
+        self.WidgetGraph = WidgetHolder()
+        self.FrameGraph = self.CreateGraphFrame(self.WidgetGraph)
+        self.LastSource = None
+        self.TimeSeriesHolder = self.SetTimeSeriesHolder()
         self.UpdateContentFrame()
-        self.FrameContent.tkraise()
-        self.Canvas.show()
+        self.FrameGraph.tkraise()
         self.resizable(width=True, height=True)
         self.update()
 
-    def CreateControlFrame(self, widgetholder):
+    def SetTimeSeriesHolder(self):
+        opt = self.WidgetSettings.Data['source'].get()
+        if opt == self.LastSource:
+            return
+        if opt == self.SourceOptions[0]:
+            holder = self.Model.EquationSolver.TimeSeries
+        if opt == self.SourceOptions[1]:
+            holder = self.Model.EquationSolver.TimeSeriesInitialSteadyState
+        if opt == self.SourceOptions[2]:
+            holder = self.Model.EquationSolver.TimeSeriesStepTrace
+        self.TimeSeriesHolder = holder
+        self.TimeAxisVariable = self.TimeSeriesHolder.TimeSeriesName
+        if self.TimeAxisVariable not in holder:
+            holder[self.TimeAxisVariable] = [0.0, 1.0]
+        self.TimeAxisMinimum = int(self.GetTimeSeries(self.TimeAxisVariable)[0])
+        self.TimeRange = None
+        self.TimeStart = self.TimeAxisMinimum
+        self.TimeSeriesList = holder.GetSeriesList()
+        # self.SeriesBoxValue.set(value=self.TimeSeriesList)
+        self.WidgetGraph.Data['equationlist'].set(value=self.TimeSeriesList)
+        self.LastSource = opt
+        return holder
+
+    def GetTimeSeries(self, series_name):
+        ser = self.TimeSeriesHolder[series_name]
+        return ser
+
+    def CreateSettingsFrame(self, widgetholder):
         frame = ttk.Frame(self, borderwidth=5, relief='sunken')
 
         button = tk.Button(frame, text='Apply', command=self.OnSettingsApply)
         button2 = tk.Button(frame, text='Cancel',
                             command=self.OnSettingsBack)
-        label = tk.Label(frame, text='Time Series Range Limit [k]')
+        label = tk.Label(frame, text='Time Series Range Limit [{0}]'.format(self.TimeAxisVariable))
         widgetholder.AddEntry(frame, 'cutoff')
-        label_start = tk.Label(frame, text='Time Series Start [k]')
+        label_start = tk.Label(frame, text='Time Series Start [{0}]'.format(self.TimeAxisVariable))
         widgetholder.AddEntry(frame, 'start')
-        buttonrow = 4
+        widgetholder.AddRadioButtons(frame, 'source', self.SourceOptions)
+        widgetholder.Data['source'].set(self.SourceOptions[0])
+        buttonrow = 5
         frame.grid(row=0, column=0)
         button.grid(row=buttonrow, column=0)
         button2.grid(row=buttonrow, column=1)
@@ -212,39 +211,71 @@ class ChartPlotterWindow2(tk.Tk):
         widgetholder.Widgets['cutoff'].grid(row=1, column=0, columnspan=2)
         label_start.grid(row=2, column=0, columnspan=2)
         widgetholder.Widgets['start'].grid(row=3, column=0, columnspan=2)
+        widgies = widgetholder.Widgets['source']
+        for i in range(0, len(widgies)):
+            widgies[i].grid(row=3, column=i)
         return frame
 
+    def CreateGraphFrame(self, widgetholder):
+        content = ttk.Frame(self, borderwidth=5, relief='sunken')
+        widgetholder.AddListBox(content, 'equationlist', height=30)
+        button = tk.Button(content, text='Settings', command=self.OnButtonClick)
+        button2 = tk.Button(content, text='Quit', command=self.quit)
+        widgetholder.AddEntry(content, 'equation', readonly=True)
+        widgetholder.AddEntry(content, 'description', readonly=True)
+        widgetholder.AddMatplotLib(content, 'graph')
+        widgetholder.Widgets['equationlist'].bind('<<ListboxSelect>>', self.OnListEvent)
+        # Gridding
+        content.grid(column=0, row=0)
+        widgetholder.Widgets['equationlist'].grid(row=0, column=0, columnspan=1, rowspan=3, sticky=['n', 'w', 'e'])
+        button.grid(column=5, row=0)
+        button2.grid(column=6, row=0)
+        widgetholder.Widgets['description'].grid(row=0, column=1, columnspan=4, sticky=['w','e'])
+        widgetholder.Widgets['equation'].grid(row=1, column=1, columnspan=6, sticky=['w', 'e'])
+        widgetholder.GetMatplotlibInfo('graph', 'canvas').get_tk_widget().grid(column=2, row=2,
+                                        columnspan=5, sticky=['n', 's', 'e', 'w'])
+        content.columnconfigure(2, weight=1)
+        content.columnconfigure(3, weight=1)
+        content.columnconfigure(4, weight=1)
+        content.rowconfigure(2, weight=1)
+        return content
+
+
     def SetSettings(self):
-        self.Settings.Data['cutoff'].set(str(self.TimeCutOff))
-        self.Settings.Data['start'].set(str(self.TimeStart))
+        self.WidgetSettings.Data['cutoff'].set(str(self.TimeRange))
+        self.WidgetSettings.Data['start'].set(str(self.TimeStart))
 
     def OnButtonClick(self):
         self.SetSettings()
-        self.FrameControls.tkraise()
+        self.FrameSettings.tkraise()
 
     def OnSettingsBack(self):
-        self.FrameContent.tkraise()
+        self.FrameGraph.tkraise()
 
     def OnSettingsApply(self):
-        start = self.Settings.Data['start'].get()
+        start = self.WidgetSettings.Data['start'].get()
         try:
-            start_n = utils.get_int(start, accept_None=False)
+            start_n = utils.get_int(start, accept_None=True)
         except:
             return
-        self.TimeStart = start_n
-        val = self.Settings.Data['cutoff'].get()
+        if start_n is None:
+            self.TimeStart = self.TimeAxisMinimum
+        else:
+            self.TimeStart = max(start_n, self.TimeAxisMinimum)
+        val = self.WidgetSettings.Data['cutoff'].get()
         try:
             val_n = utils.get_int(val)
         except:
             return
-        if val_n == 0:
-            return
         if val_n is None:
-            self.TimeCutOff = None
+            self.TimeRange = None
+        elif val_n < 1:
+            return
         else:
-            self.TimeCutOff = val_n + self.TimeStart
+            self.TimeRange = val_n
+        self.SetTimeSeriesHolder()
         self.UpdateContentFrame()
-        self.FrameContent.tkraise()
+        self.FrameGraph.tkraise()
 
     def OnListEvent(self, event):
         self.UpdateContentFrame()
@@ -252,37 +283,46 @@ class ChartPlotterWindow2(tk.Tk):
     def UpdateContentFrame(self):
         # Do the cutoff inside the GUI, as we may switch to alternative
         # time series sources.
-        x = self.Model.GetTimeSeries('k', cutoff=None)
-        idx = self.WidgetListVariableNames.curselection()
+        x = self.GetTimeSeries(self.TimeAxisVariable)
+        # idx = self.WidgetListVariableNames.curselection()
+        idx = self.WidgetGraph.Widgets['equationlist'].curselection()
         if len(idx) == 0:
             idx = 0
         else:
             idx = idx[0]
         series_name = self.TimeSeriesList[idx]
         try:
-            y = self.Model.GetTimeSeries(series_name, cutoff=None)
+            y = self.GetTimeSeries(series_name)
         except KeyError:
             return
         desc = ''
         eqn = ''
         eqn_str, desc = utils.get_series_info(series_name, self.Model)
-        self.EquationString.set(eqn_str)
-        self.DescriptionString.set(desc)
-        # Must process end before first, otherwise numbering is messed up.
-        if self.TimeCutOff is not None and len(x) > self.TimeCutOff:
-            x = x[0:self.TimeCutOff]
-            y = y[0:self.TimeCutOff]
-        if self.TimeStart > 0:
-            x = x[self.TimeStart:]
-            y = y[self.TimeStart:]
-
-        self.Line.set_data(x,y)
+        self.WidgetGraph.Data['equation'].set(eqn_str)
+        self.WidgetGraph.Data['description'].set(desc)
+        if self.TimeStart > self.TimeAxisMinimum:
+            if self.TimeStart <  self.TimeAxisMinimum + len(x):
+                x = x[self.TimeStart - self.TimeAxisMinimum:]
+                y = y[self.TimeStart - self.TimeAxisMinimum:]
+        if self.TimeRange is not None and len(x) > self.TimeRange:
+            x = x[0:self.TimeRange]
+            y = y[0:self.TimeRange]
+        self.WidgetGraph.GetMatplotlibInfo('graph', 'line').set_data(x,y)
+        # self.Line.set_data(x,y)
         # Based on stackoverflow "How do I Refresh a matplotlib plot in a Tkinter window?"
         # self.Canvas = FigureCanvasTkAgg(Fig, master=self)
-        ax = self.Canvas.figure.gca()
+        # ax = self.Canvas.figure.gca()
+        # ax.set_xlim(min(x), max(x))
+        # ax.set_ylim(min(y)-1, max(y)+1)
+        # ax.set_xlabel(self.TimeAxisVariable)
+        # self.Canvas.draw()
+
+        canvas = self.WidgetGraph.GetMatplotlibInfo('graph', 'canvas')
+        ax = canvas.figure.gca()
         ax.set_xlim(min(x), max(x))
         ax.set_ylim(min(y)-1, max(y)+1)
-        ax.set_xlabel('k')
-        self.Canvas.draw()
+        ax.set_xlabel(self.TimeAxisVariable)
+        canvas.draw()
+
 
 

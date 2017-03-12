@@ -21,6 +21,11 @@ limitations under the License.
 
 import copy
 import sys
+import matplotlib
+matplotlib.use('TKagg')
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
+from matplotlib.figure import Figure
+import matplotlib.pyplot
 
 if sys.version_info[0] < 3:
     import Tkinter as tk
@@ -35,10 +40,39 @@ class WidgetHolder(object):
     def __init__(self):
         self.Widgets = {}
         self.Data = {}
+        self.MatplotlibInfo = {}
 
-    def AddEntry(self, parent, name):
+    def AddEntry(self, parent, name, readonly=False):
         self.Data[name] = StringVar()
-        self.Widgets[name] = Entry(parent, textvariable=self.Data[name])
+        if readonly:
+            self.Widgets[name] = Entry(parent, state=['readonly',], textvariable=self.Data[name])
+        else:
+            self.Widgets[name] = Entry(parent, textvariable=self.Data[name])
+
+    def AddListBox(self, parent, name, height=10):
+        self.Data[name] = StringVar()
+        self.Widgets[name] = Listbox(parent, listvariable=self.Data[name], height=height)
+
+    def AddMatplotLib(self, parent, name):
+        Fig = matplotlib.figure.Figure(figsize=(7.5, 5), dpi=90)
+        subplot = Fig.add_subplot(111)
+        x = []
+        y = []
+        self.MatplotlibInfo[name+"line"], = subplot.plot(x, y, 'bo-')
+        self.MatplotlibInfo[name+'canvas'] = FigureCanvasTkAgg(Fig, master=parent)
+
+    def AddRadioButtons(self, parent, name, options):
+        self.Data[name] = StringVar()
+        widgies = []
+        for opt in options:
+            widgies.append(ttk.Radiobutton(parent, text=opt, variable=self.Data[name], value=opt))
+        self.Widgets[name] = widgies
+
+    def GetMatplotlibInfo(self, name, objectname):
+        if not objectname in ('line', 'canvas'):
+            raise ValueError('Unknown type of object')
+        return self.MatplotlibInfo[name+objectname]
+
 
 def sort_series(serlist):
     """
@@ -90,5 +124,9 @@ def get_series_info(series_name, mod):
     if eqn_str == '' and series_name == 't':
         eqn_str = 't = k'
         desc = '[t] Automatically generated time axis; user may override as a global equation.'
+    if eqn_str == '' and series_name == 'iteration':
+        desc = 'The iteration step within the solver algorithm'
+    if eqn_str == '' and series_name == 'iteration_error':
+        desc = 'Fitting error for equations at each iteration of the solver.'
     return eqn_str, desc
 

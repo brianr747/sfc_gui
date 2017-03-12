@@ -15,12 +15,11 @@ tax = TaxFlow(can, 'TaxFlow', 'TF', .2)
 labour = Market(can, 'Labour market', 'LAB')
 goods = Market(can, 'Goods market', 'GOOD')
 # Need to set the exogenous variable - Government demand for Goods ("G" in economist symbology)
-mod.AddExogenous('GOV', 'DEM_GOOD', '[0.,]*5 + [20.,] * 105')
+mod.AddExogenous('GOV', 'DEM_GOOD', '([20.,] * 5) + [30.,]*100 ')
 mod.AddGlobalEquation('t', 'Decorated Time Axis', '1950.0 + 0.25*k')
 
-#builder = chapter3.SIM('CAN')
-#mod = builder.build_model()
-
+mod.EquationSolver.TraceStep = 7
+mod.EquationSolver.SolveInitialSteadyState = True
 mod.main()
 
 window = ChartPlotterWindow2(None, mod)
