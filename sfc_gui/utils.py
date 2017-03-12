@@ -68,6 +68,10 @@ class WidgetHolder(object):
             widgies.append(ttk.Radiobutton(parent, text=opt, variable=self.Data[name], value=opt))
         self.Widgets[name] = widgies
 
+    def AddVariableLabel(self, parent, name):
+        self.Data[name] = StringVar()
+        self.Widgets[name] = tk.Label(parent, textvariable=self.Data[name])
+
     def GetMatplotlibInfo(self, name, objectname):
         if not objectname in ('line', 'canvas'):
             raise ValueError('Unknown type of object')

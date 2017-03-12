@@ -197,23 +197,27 @@ class ChartPlotterWindow2(tk.Tk):
         button = tk.Button(frame, text='Apply', command=self.OnSettingsApply)
         button2 = tk.Button(frame, text='Cancel',
                             command=self.OnSettingsBack)
-        label = tk.Label(frame, text='Time Series Range Limit [{0}]'.format(self.TimeAxisVariable))
+        widgetholder.AddVariableLabel(frame, 'range')
+        widgetholder.AddVariableLabel(frame, 'startlabel')
+        # widgetholder.Data['range'].set('Time Series Range Limit [{0}]'.format(self.TimeAxisVariable))
+        #label = tk.Label(frame, text='Time Series Range Limit [{0}]'.format(self.TimeAxisVariable))
+
         widgetholder.AddEntry(frame, 'cutoff')
-        label_start = tk.Label(frame, text='Time Series Start [{0}]'.format(self.TimeAxisVariable))
+        # label_start = tk.Label(frame, text='Time Series Start [{0}]'.format(self.TimeAxisVariable))
         widgetholder.AddEntry(frame, 'start')
         widgetholder.AddRadioButtons(frame, 'source', self.SourceOptions)
         widgetholder.Data['source'].set(self.SourceOptions[0])
         buttonrow = 5
         frame.grid(row=0, column=0)
-        button.grid(row=buttonrow, column=0)
-        button2.grid(row=buttonrow, column=1)
-        label.grid(row=0, column=0, columnspan=2)
-        widgetholder.Widgets['cutoff'].grid(row=1, column=0, columnspan=2)
-        label_start.grid(row=2, column=0, columnspan=2)
-        widgetholder.Widgets['start'].grid(row=3, column=0, columnspan=2)
+        button.grid(row=buttonrow, column=2)
+        button2.grid(row=buttonrow, column=0)
+        widgetholder.Widgets['range'].grid(row=0, column=0, columnspan=3)
+        widgetholder.Widgets['cutoff'].grid(row=1, column=0, columnspan=3)
+        widgetholder.Widgets['startlabel'].grid(row=2, column=0, columnspan=3)
+        widgetholder.Widgets['start'].grid(row=3, column=0, columnspan=3)
         widgies = widgetholder.Widgets['source']
         for i in range(0, len(widgies)):
-            widgies[i].grid(row=3, column=i)
+            widgies[i].grid(row=4, column=i)
         return frame
 
     def CreateGraphFrame(self, widgetholder):
@@ -244,6 +248,8 @@ class ChartPlotterWindow2(tk.Tk):
     def SetSettings(self):
         self.WidgetSettings.Data['cutoff'].set(str(self.TimeRange))
         self.WidgetSettings.Data['start'].set(str(self.TimeStart))
+        self.WidgetSettings.Data['range'].set('Time Series Range Limit [{0}]'.format(self.TimeAxisVariable))
+        self.WidgetSettings.Data['startlabel'].set('Time Series Start [{0}]'.format(self.TimeAxisVariable))
 
     def OnButtonClick(self):
         self.SetSettings()
