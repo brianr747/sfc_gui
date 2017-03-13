@@ -40,6 +40,7 @@ class WidgetHolder(object):
     def __init__(self):
         self.Widgets = {}
         self.Data = {}
+        self.ListBoxType = {}
         self.MatplotlibInfo = {}
 
     def AddEntry(self, parent, name, readonly=False):
@@ -49,9 +50,46 @@ class WidgetHolder(object):
         else:
             self.Widgets[name] = Entry(parent, textvariable=self.Data[name])
 
-    def AddListBox(self, parent, name, height=10):
+    def AddButton(self, parent, name, text, command, state='!disabled'):
+        self.Widgets[name] = ttk.Button(parent, text=text, command=command, state=state)
+
+    def AddTree(self, parent, name, columns):
+        self.Widgets[name] = ttk.Treeview(parent, columns=columns)
+
+    def AddListBox(self, parent, name, height=10, single_select=True, callback=None):
+        if single_select:
+            select_mode = 'browse'
+        else:
+            select_mode='extended'
+        self.ListBoxType[name] = select_mode
         self.Data[name] = StringVar()
-        self.Widgets[name] = Listbox(parent, listvariable=self.Data[name], height=height)
+        self.Widgets[name] = Listbox(parent, listvariable=self.Data[name], height=height,
+                                     selectmode=select_mode)
+        if callback is not None:
+            self.Widgets[name].bind('<<ListboxSelect>>', callback)
+
+    def GetListBox(self, name):
+        """
+        If single_select: returns string or None (no selection).
+
+        If multi-select, always returns a list of strings (possibly empty).
+
+        :param name:
+        :return:
+        """
+        indices = self.Widgets[name].curselection()
+        mlist =  self.Data[name].get()
+        mlist = eval(mlist)
+        if self.ListBoxType[name] == 'browse':
+            if len(indices) == 0:
+                return None
+            else:
+                return mlist[indices[0]]
+        else:
+            return [mlist[x[0]] for x in indices]
+
+
+
 
     def AddMatplotLib(self, parent, name):
         Fig = matplotlib.figure.Figure(figsize=(7.5, 5), dpi=90)

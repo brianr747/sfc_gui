@@ -3,6 +3,7 @@
 from sfc_models.objects import *
 from sfc_gui.chart_plotter import ChartPlotterWindow2
 
+register_standard_logs('output', __file__)
 mod = Model()
 # Create first country - Canada. (This model only has one country.)
 can = Country(mod, 'Canada', 'CA')
