@@ -187,6 +187,10 @@ class ChartPlotterWindow2(tk.Tk):
         self.LastSource = opt
         return holder
 
+    def GetTimeSeries(self, series_name):
+        ser = self.TimeSeriesHolder[series_name]
+        return ser
+
     def CreateSettingsFrame(self, widgetholder):
         frame = ttk.Frame(self, borderwidth=5, relief='sunken')
 

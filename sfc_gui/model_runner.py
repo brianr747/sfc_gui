@@ -9,6 +9,7 @@ import os
 import sys
 
 from sfc_models.models import Model
+from sfc_models.utils import Logger
 import sfc_gui.utils
 import sfc_gui.module_loader
 import sfc_gui.chart_plotter
@@ -45,9 +46,9 @@ class ModelRunner(tk.Tk):
         self.MinWidth = 500
         self.MinHeight = 600
         try:
-            newdir = os.getenv('SFCMODELSGUIDIR')
-            if newdir is not None:
-                os.chdir(newdir)
+            new_dir = os.getenv('SFCMODELSGUIDIR')
+            if new_dir is not None:
+                os.chdir(new_dir)
         except:
             pass
         self.wm_title('sfc_models Model Runner')
@@ -58,7 +59,6 @@ class ModelRunner(tk.Tk):
         self.PreviousEquations = []
         self.CurrentEquations = []
         self.Sectors = []
-
         self.FrameChooser.tkraise()
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
@@ -80,6 +80,7 @@ class ModelRunner(tk.Tk):
         else:
             logdir = ''
         widgetholder.Data['logdir'].set(logdir)
+        self.Parameters.LogDir = logdir
         # Log directory
         label_log = Label(frame, text='Log Directory')
         button_choose_log = ttk.Button(frame, text='Choose', command=self.OnChooseDir)
@@ -171,21 +172,30 @@ class ModelRunner(tk.Tk):
         widgetholder.AddButton(run_frame, 'run_next', 'Run Next Step', command=self.OnRunNext)
         widgetholder.AddButton(run_frame, 'run_all', 'Run All Steps', command=self.OnRunAll)
         widgetholder.AddVariableLabel(run_frame, 'next_step')
+        label_choose_next = ttk.Label(run_frame, text='Possible Choices')
+        widgetholder.AddListBox(run_frame, 'possible_steps', height=7, single_select=True,
+                                callback=self.UpdateModelViewer)
         widgetholder.AddButton(run_frame, 'show_graph', 'Show Graph', command=self.OnShowGraph)
         widgetholder.Widgets['reload'].grid(row=0, column=0)
         label_next_step.grid(row=1, column=0, pady=(10,0))
         widgetholder.Widgets['next_step'].grid(row=2, column=0)
         widgetholder.Widgets['run_next'].grid(row=3, column=0)
-        widgetholder.Widgets['run_all'].grid(row=4, column=0, pady=20)
-        widgetholder.Widgets['show_graph'].grid(row=5, column=0, pady=20)
+        label_choose_next.grid(row=4, column=0)
+        widgetholder.Widgets['possible_steps'].grid(row=5, column=0)
+        widgetholder.Widgets['run_all'].grid(row=6, column=0, pady=20)
+
+        widgetholder.Widgets['show_graph'].grid(row=7, column=0, pady=20)
         return frame
 
     def OnRunNext(self):
         steps = self.Model._GetSteps()
-        if len(steps)==0:
+        if len(steps) == 0:
             return
-        first_step = steps[0][0]
-        self.Model._RunStep(first_step)
+        else:
+            next_step = self.WidgetsModelViewer.GetListBox('possible_steps')
+            if next_step is None:
+                next_step = steps[0][0]
+        self.Model._RunStep(next_step)
         self.UpdateModelViewer()
 
     def OnRunAll(self):
@@ -226,6 +236,10 @@ class ModelRunner(tk.Tk):
             self.FrameChooser.tkraise()
             return
         self.CleanupOnModelChange()
+        Logger.cleanup()
+        if not self.Parameters.LogDir == '':
+            base_name = os.path.join(self.Parameters.LogDir, name)
+            Logger.register_standard_logs(base_file_name=base_name)
         python_mod = self.Importer(name)
         self.Model = python_mod.build_model()
         if type(self.Model) is not Model:
@@ -246,15 +260,21 @@ class ModelRunner(tk.Tk):
                 self.WidgetsModelViewer.DeleteTreeChildren('equations', child)
 
 
-    def UpdateModelViewer(self):
+    def UpdateModelViewer(self, event=None):
         name = self.GetModelName()
         self.WidgetsModelViewer.Data['model_name'].set(name)
         self.WidgetsModelViewer.Data['model_state'].set(self.Model.State)
         steps = self.Model._GetSteps()
         if len(steps) == 0:
+            self.WidgetsModelViewer.Data['possible_steps'].set('')
+        else:
+            self.WidgetsModelViewer.Data['possible_steps'].set(steps[0])
+        if len(steps) == 0:
             next_step = ''
         else:
-            next_step = steps[0][0]
+            next_step = self.WidgetsModelViewer.GetListBox('possible_steps')
+            if next_step is None:
+                next_step = steps[0][0]
         self.WidgetsModelViewer.Data['next_step'].set(next_step)
         treewidget = self.WidgetsModelViewer.Widgets['equations']
         country_list =   [x.Code for x in self.Model.CountryList]
@@ -363,6 +383,7 @@ class ModelRunner(tk.Tk):
         if target == () or target == '':
             return
         self.WidgetsChooser.Data['logdir'].set(target)
+        self.Parameters.LogDir = target
 
     def OnChangeModel(self, event):
         idx = self.WidgetsChooser.Widgets['models'].curselection()

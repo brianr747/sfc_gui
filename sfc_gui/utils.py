@@ -50,6 +50,7 @@ class Parameters(object):
         self.TimeAxisVariable = 'k'
         self.MinWidth = 800
         self.MinHeight = 600
+        self.LogDir = ''
         self.SourceOptions = ('Time Series', 'Initial Steady State', 'Convergence Trace')
         self.LastSource = ''
 
