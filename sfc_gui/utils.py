@@ -27,6 +27,8 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from matplotlib.figure import Figure
 import matplotlib.pyplot
 
+from sfc_models.models import Model
+
 if sys.version_info[0] < 3:
     import Tkinter as tk
     from Tkinter import *
@@ -35,6 +37,55 @@ else:
     import tkinter as tk
     from tkinter import *
     from tkinter import ttk
+
+class Parameters(object):
+    """
+    Class to hold common data members that are shared by multiple frame objects.
+    Not all Frames will use all data.
+    """
+    def __init__(self):
+        self.Model = Model()
+        self.ModelName = ''
+        self.TimeSeriesHolder = self.Model.EquationSolver.TimeSeries
+        self.TimeAxisVariable = 'k'
+        self.MinWidth = 800
+        self.MinHeight = 600
+        self.SourceOptions = ('Time Series', 'Initial Steady State', 'Convergence Trace')
+        self.LastSource = ''
+
+    def SetModel(self, model):
+        self.Model = model
+        self.LastSource = ''
+        self.SetTimeSeriesHolder()
+
+    def SetTimeSeriesHolder(self, source_str='Time Series'):
+        opt = source_str
+        if opt not in self.SourceOptions:
+            raise ValueError('Unknown time series source: ' + opt)
+        if opt == self.LastSource:
+            return
+        if opt == self.SourceOptions[0]:
+            holder = self.Model.EquationSolver.TimeSeries
+        if opt == self.SourceOptions[1]:
+            holder = self.Model.EquationSolver.TimeSeriesInitialSteadyState
+        if opt == self.SourceOptions[2]:
+            holder = self.Model.EquationSolver.TimeSeriesStepTrace
+        self.TimeSeriesHolder = holder
+        self.TimeAxisVariable = self.TimeSeriesHolder.TimeSeriesName
+        if self.TimeAxisVariable not in holder:
+            holder[self.TimeAxisVariable] = [0.0, 1.0]
+        self.TimeAxisMinimum = int(self.GetTimeSeries(self.TimeAxisVariable)[0])
+        self.TimeRange = None
+        self.TimeStart = self.TimeAxisMinimum
+        self.TimeSeriesList = holder.GetSeriesList()
+        self.LastSource = opt
+        return holder
+
+    def GetTimeSeries(self, series_name):
+        ser = self.TimeSeriesHolder[series_name]
+        return ser
+
+
 
 class WidgetHolder(object):
     def __init__(self):
@@ -87,6 +138,12 @@ class WidgetHolder(object):
                 return mlist[indices[0]]
         else:
             return [mlist[x[0]] for x in indices]
+
+    def DeleteTreeChildren(self, name, item_code):
+        treewidget = self.Widgets[name]
+        children = treewidget.get_children(item_code)
+        for child in children:
+            treewidget.delete(child)
 
 
 

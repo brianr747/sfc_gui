@@ -27,7 +27,7 @@ from matplotlib.figure import Figure
 import matplotlib.pyplot
 from sfc_models.models import Model
 import sfc_gui.utils as utils
-from sfc_gui.utils import WidgetHolder
+from sfc_gui.utils import WidgetHolder, Parameters
 
 if sys.version_info[0] < 3:
     import Tkinter as tk
@@ -187,10 +187,6 @@ class ChartPlotterWindow2(tk.Tk):
         self.LastSource = opt
         return holder
 
-    def GetTimeSeries(self, series_name):
-        ser = self.TimeSeriesHolder[series_name]
-        return ser
-
     def CreateSettingsFrame(self, widgetholder):
         frame = ttk.Frame(self, borderwidth=5, relief='sunken')
 
@@ -224,7 +220,7 @@ class ChartPlotterWindow2(tk.Tk):
         content = ttk.Frame(self, borderwidth=5, relief='sunken')
         widgetholder.AddListBox(content, 'equationlist', height=30)
         button = tk.Button(content, text='Settings', command=self.OnButtonClick)
-        button2 = tk.Button(content, text='Quit', command=self.quit)
+        button2 = tk.Button(content, text='Close', command=self.destroy)
         widgetholder.AddEntry(content, 'equation', readonly=True)
         widgetholder.AddEntry(content, 'description', readonly=True)
         widgetholder.AddMatplotLib(content, 'graph')
@@ -329,6 +325,93 @@ class ChartPlotterWindow2(tk.Tk):
         ax.set_ylim(min(y)-1, max(y)+1)
         ax.set_xlabel(self.TimeAxisVariable)
         canvas.draw()
+
+
+# Try again; this time as a Frame
+class ChartPlotterFrame(ttk.Frame):
+    def __init__(self, parent, parameters=None):
+        ttk.Frame.__init__(self, parent)
+        self.Parameters = utils.Parameters()
+        if parameters is not None:
+            self.Parameters = parameters
+
+        self.OnSettingsCallback = self.OnSettings_Stub
+        self.WidgetHolder = WidgetHolder()
+        inner_frame = ttk.Frame(self, borderwidth=5, relief='sunken',
+                                width=self.Parameters.MinWidth,
+                                height=self.Parameters.MinHeight)
+        widgetholder = self.WidgetHolder
+        widgetholder.AddButton(self, 'closer', 'Close', command=self.OnClose)
+        widgetholder.AddListBox(self, 'equationlist', height=30)
+        button = ttk.Button(self, text='Settings', command=self.OnSettingsCallback)
+        widgetholder.AddEntry(self, 'equation', readonly=True)
+        widgetholder.AddEntry(self, 'description', readonly=True)
+        widgetholder.AddMatplotLib(self, 'graph')
+        widgetholder.Widgets['equationlist'].bind('<<ListboxSelect>>', self.OnListEvent)
+        # Gridding
+        self.grid(column=0, row=0)
+        inner_frame.grid(row=0, column=0, rowspan=5, columnspan=3, sticky=('N', 'S', 'E', 'W'))
+        widgetholder.Widgets['equationlist'].grid(row=0, column=0, columnspan=1, rowspan=3, sticky=['n', 'w', 'e', 'S'])
+        button.grid(column=5, row=0)
+        widgetholder.Widgets['closer'].grid(column=6, row=0)
+        widgetholder.Widgets['description'].grid(row=0, column=1, columnspan=4, sticky=['w','e'])
+        widgetholder.Widgets['equation'].grid(row=1, column=1, columnspan=6, sticky=['w', 'e'])
+        widgetholder.GetMatplotlibInfo('graph', 'canvas').get_tk_widget().grid(column=2, row=2,
+                                        columnspan=5, sticky=['n', 's', 'e', 'w'])
+        self.columnconfigure(2, weight=1)
+        self.columnconfigure(3, weight=1)
+        self.columnconfigure(4, weight=1)
+        self.rowconfigure(2, weight=1)
+        self.UpdateEquationList()
+
+    def UpdateEquationList(self):
+        self.WidgetHolder.Data['equationlist'].set(value=self.Parameters.TimeSeriesList)
+
+    def Update(self):
+        # Do the cutoff inside the GUI, as we may switch to alternative
+        # time series sources.
+        x = self.Parameters.GetTimeSeries(self.Parameters.TimeAxisVariable)
+        # idx = self.WidgetListVariableNames.curselection()
+        varname = self.WidgetHolder.GetListBox('equationlist')
+        if varname is None:
+            return
+        try:
+            y = self.Parameters.GetTimeSeries(varname)
+        except KeyError:
+            return
+        eqn_str, desc = utils.get_series_info(varname, self.Parameters.Model)
+        self.WidgetHolder.Data['equation'].set(eqn_str)
+        self.WidgetHolder.Data['description'].set(desc)
+        if self.Parameters.TimeStart > self.Parameters.TimeAxisMinimum:
+            if self.Parameters.TimeStart <  self.Parameters.TimeAxisMinimum + len(x):
+                x = x[self.Parameters.TimeStart - self.Parameters.TimeAxisMinimum:]
+                y = y[self.Parameters.TimeStart - self.Parameters.TimeAxisMinimum:]
+        if self.Parameters.TimeRange is not None and len(x) > self.Parameters.TimeRange:
+            x = x[0:self.Parameters.TimeRange]
+            y = y[0:self.Parameters.TimeRange]
+        self.WidgetHolder.GetMatplotlibInfo('graph', 'line').set_data(x,y)
+        # Based on stackoverflow "How do I Refresh a matplotlib plot in a Tkinter window?"
+        canvas = self.WidgetHolder.GetMatplotlibInfo('graph', 'canvas')
+        ax = canvas.figure.gca()
+        ax.set_xlim(min(x), max(x)+1)
+        ax.set_ylim(min(y) - 1, max(y) + 1)
+        ax.set_xlabel(self.Parameters.TimeAxisVariable)
+        canvas.draw()
+
+
+    def OnSettings_Stub(self):
+        print('Must set self.OnSettingsCallback')
+
+    def OnListEvent(self, event):
+        self.Update()
+
+    def OnClose(self):
+        self.destroy()
+
+
+
+
+
 
 
 

@@ -11,7 +11,8 @@ import sys
 from sfc_models.models import Model
 import sfc_gui.utils
 import sfc_gui.module_loader
-from sfc_gui.utils import WidgetHolder
+import sfc_gui.chart_plotter
+from sfc_gui.utils import WidgetHolder, Parameters
 
 if sys.version_info[0] < 3:
     import Tkinter as tk
@@ -39,13 +40,24 @@ class ModelRunner(tk.Tk):
         :param parent:
         """
         tk.Tk.__init__(self, parent)
+        self.Parent = parent
+        self.Parameters = Parameters()
         self.MinWidth = 500
         self.MinHeight = 600
+        try:
+            newdir = os.getenv('SFCMODELSGUIDIR')
+            if newdir is not None:
+                os.chdir(newdir)
+        except:
+            pass
         self.wm_title('sfc_models Model Runner')
         self.WidgetsChooser = WidgetHolder()
         self.FrameChooser = self.CreateChooser(self.WidgetsChooser)
         self.WidgetsModelViewer = WidgetHolder()
         self.FrameModelViewer = self.CreateModelViewer(self.WidgetsModelViewer)
+        self.PreviousEquations = []
+        self.CurrentEquations = []
+        self.Sectors = []
 
         self.FrameChooser.tkraise()
         self.columnconfigure(0, weight=1)
@@ -110,10 +122,17 @@ class ModelRunner(tk.Tk):
         frame = ttk.Frame(self)
         inner_frame = ttk.Frame(frame, borderwidth=5, relief='sunken', width=self.MinWidth,
                           height=self.MinHeight)
+
         widgetholder.AddVariableLabel(frame, 'model_name')
         widgetholder.AddVariableLabel(frame, 'model_state')
         widgetholder.AddButton(frame, 'back', text='Back', command=self.OnModelViewerBack)
         # widgetholder.AddListBox(frame, 'country', height=5, callback=self.OnChangeCountry)
+        widgetholder.AddButton(frame, 'fullcodes', 'Generate\nFullCodes',
+                               command=self.OnGenerateFullCodes)
+        widgetholder.AddButton(frame, 'fixaliases', 'Fix Aliases',
+                               command=self.OnFixAliases)
+        widgetholder.AddButton(frame, 'generate_eqn', 'Generate\nEquations',
+                               command=self.OnGenerateEquations)
         widgetholder.AddTree(frame, 'equations', columns=('Equation', 'Comment'))
         # Push a configuration variable into the WidgetHolder
         widgetholder.Data['parameter_final_equation'] = 'Final Equations (All)'
@@ -122,16 +141,77 @@ class ModelRunner(tk.Tk):
         self.WidgetsModelViewer.Widgets['equations']['yscrollcommand'] = scrolly.set
         # Gridding
         frame.grid(row=0, column=0,  sticky=('N', 'S', 'E', 'W'))
-        self.WidgetsModelViewer.Widgets['model_name'].grid(row=0, column=0)
-        self.WidgetsModelViewer.Widgets['model_state'].grid(row=0, column=1)
-        self.WidgetsModelViewer.Widgets['back'].grid(row=0, column=2)
-        self.WidgetsModelViewer.Widgets['equations'].grid(row=1, column=0, columnspan=3,
-                                                          sticky=('N', 'S', 'W', 'E'))
-        scrolly.grid(row=1, column=3, sticky=('N', 'S'))
-        inner_frame.grid(row=0, column=0, rowspan=5, columnspan=3, sticky=('N', 'S', 'E', 'W'))
-        frame.columnconfigure(1, weight=1)
+        label_name = ttk.Label(frame, text='Model Name: ')
+        label_name.grid(row=0, column=0, sticky=('E',))
+        self.WidgetsModelViewer.Widgets['model_name'].grid(row=0, column=1,sticky=('W',))
+        label_state = ttk.Label(frame, text="State: ")
+        label_state.grid(row=0, column=2, sticky=('E'))
+        self.WidgetsModelViewer.Widgets['model_state'].grid(row=0, column=3, sticky=('W',))
+        self.WidgetsModelViewer.Widgets['back'].grid(row=0, column=4, sticky=('E'))
+        self.WidgetsModelViewer.Widgets['equations'].grid(row=1, column=0, columnspan=5,
+                                                          rowspan=5, sticky=('N', 'S', 'W', 'E'))
+        scrolly.grid(row=1, column=6, rowspan=3, sticky=('N', 'S'))
+        # self.WidgetsModelViewer.Widgets['fullcodes'].grid(row=1, column=4, sticky=('N', 'E'))
+        # self.WidgetsModelViewer.Widgets['fixaliases'].grid(row=2, column=4, sticky=('N', 'E'))
+        # self.WidgetsModelViewer.Widgets['generate_eqn'].grid(row=3, column=4, sticky=('N', 'E'))
+        inner_frame.grid(row=0, column=0, rowspan=5, columnspan=6, sticky=('N', 'S', 'E', 'W'))
+        #frame.columnconfigure(0, weight=1)
+        #frame.columnconfigure(1, weight=1)
+        #frame.columnconfigure(2, weight=1)
+        #frame.columnconfigure(3, weight=1)
+        frame.columnconfigure(4, weight=2)
         frame.rowconfigure(1, weight=1)
+        frame.rowconfigure(2, weight=1)
+        frame.rowconfigure(3, weight=1)
+        run_frame = ttk.LabelFrame(frame, text='Run')
+        run_frame.grid(row=0, column=7, rowspan=5, sticky=('N', 'S', 'E', 'W'))
+        widgetholder.AddButton(run_frame, 'reload', 'Reload',
+                               command=self.OnRunModel)
+        label_next_step = ttk.Label(run_frame, text='Next Step:', width=25)
+        widgetholder.AddButton(run_frame, 'run_next', 'Run Next Step', command=self.OnRunNext)
+        widgetholder.AddButton(run_frame, 'run_all', 'Run All Steps', command=self.OnRunAll)
+        widgetholder.AddVariableLabel(run_frame, 'next_step')
+        widgetholder.AddButton(run_frame, 'show_graph', 'Show Graph', command=self.OnShowGraph)
+        widgetholder.Widgets['reload'].grid(row=0, column=0)
+        label_next_step.grid(row=1, column=0, pady=(10,0))
+        widgetholder.Widgets['next_step'].grid(row=2, column=0)
+        widgetholder.Widgets['run_next'].grid(row=3, column=0)
+        widgetholder.Widgets['run_all'].grid(row=4, column=0, pady=20)
+        widgetholder.Widgets['show_graph'].grid(row=5, column=0, pady=20)
         return frame
+
+    def OnRunNext(self):
+        steps = self.Model._GetSteps()
+        if len(steps)==0:
+            return
+        first_step = steps[0][0]
+        self.Model._RunStep(first_step)
+        self.UpdateModelViewer()
+
+    def OnRunAll(self):
+        self.Model._RunAllSteps()
+        self.UpdateModelViewer()
+
+    def OnShowGraph(self):
+        self.Parameters.SetModel(self.Model)
+        self.FramePlotter = sfc_gui.chart_plotter.ChartPlotterFrame(self, parameters=self.Parameters)
+        self.FramePlotter.tkraise()
+
+    def OnGenerateFullCodes(self):
+        self.Model._GenerateFullSectorCodes()
+        self.UpdateModelViewer()
+
+    def OnFixAliases(self):
+        self.Model._FixAliases()
+        self.UpdateModelViewer()
+
+    def OnGenerateEquations(self):
+        if len(self.Sectors) == 0:
+            return
+        sector = self.Sectors.pop(0)
+        print(sector.Code)
+        sector._GenerateEquations()
+        self.UpdateModelViewer()
 
     def OnModelViewerBack(self):
         self.FrameChooser.tkraise()
@@ -139,42 +219,71 @@ class ModelRunner(tk.Tk):
     def GetModelName(self):
         return self.WidgetsChooser.GetListBox('models')
 
-    def OnChangeCountry(self, event):
-        print('Bink!')
-
     def OnRunModel(self):
         name = self.GetModelName()
         if name is None:
-            # Shouldn't reach here; GUI logic error
-            raise ValueError('No model selected? GUI logic error.')
+            # Not sure how we get here, but, go back to chooser frame
+            self.FrameChooser.tkraise()
+            return
+        self.CleanupOnModelChange()
         python_mod = self.Importer(name)
         self.Model = python_mod.build_model()
         if type(self.Model) is not Model:
             raise ValueError('Expected a Model, got {0} instead'.format(type(Model)))
+        self.Sectors = self.Model.GetSectors()
         self.UpdateModelViewer()
         self.FrameModelViewer.tkraise()
+
+    def CleanupOnModelChange(self):
+        kept_list = ('FINAL*EQUATIONS', 'CHANGED*EQUATIONS', 'SECTOR*EQUATIONS')
+        treewidget = self.WidgetsModelViewer.Widgets['equations']
+        children = treewidget.get_children()
+        self.Sectors = []
+        for child in children:
+            if child not in kept_list:
+                treewidget.delete(child)
+            else:
+                self.WidgetsModelViewer.DeleteTreeChildren('equations', child)
+
 
     def UpdateModelViewer(self):
         name = self.GetModelName()
         self.WidgetsModelViewer.Data['model_name'].set(name)
         self.WidgetsModelViewer.Data['model_state'].set(self.Model.State)
-
+        steps = self.Model._GetSteps()
+        if len(steps) == 0:
+            next_step = ''
+        else:
+            next_step = steps[0][0]
+        self.WidgetsModelViewer.Data['next_step'].set(next_step)
         treewidget = self.WidgetsModelViewer.Widgets['equations']
         country_list =   [x.Code for x in self.Model.CountryList]
         final_name = 'FINAL*EQUATIONS'
-        root_list = [final_name,] + country_list
+        root_list = [final_name, 'CHANGED*EQUATIONS', 'SECTOR*EQUATIONS'] + country_list
         # First: Eliminate countries (and children) that do not exist.
         on_tree = treewidget.get_children()
         # Cannot iterate on get_children(), as we modify the output with every delete!
         for name in on_tree:
             if name not in root_list:
                 treewidget.delete(name)
+        self.PreviousEquations = tuple(self.CurrentEquations)
+        self.CurrentEquations = []
         # FINAL_EQUATIONS
         if final_name not in on_tree:
             treewidget.insert('', 'end',final_name,
                               text=self.WidgetsModelViewer.Data['parameter_final_equation'],
                               open=False)
-            # Insert final equations here...
+        if 'SECTOR*EQUATIONS' not in on_tree:
+            treewidget.insert('', 'end', 'SECTOR*EQUATIONS', text='Sector Equations', open=False)
+        if 'CHANGED*EQUATIONS' not in on_tree:
+            treewidget.insert('', 'end', 'CHANGED*EQUATIONS', text='Changed Equations', open=False)
+        self.WidgetsModelViewer.DeleteTreeChildren('equations', final_name)
+        for varname in self.Model.FinalEquationBlock.GetEquationList():
+            eqn = self.Model.FinalEquationBlock[varname]
+            eqn_str = '{0} = {1}'.format(varname, eqn.GetRightHandSide())
+            treewidget.insert(final_name, 'end', varname,
+                              text=eqn.LeftHandSide,
+                              values=(eqn_str, eqn.Description))
         for country_obj in self.Model.CountryList:
             country_code = country_obj.Code
             if country_obj.Code not in on_tree:
@@ -194,24 +303,46 @@ class ModelRunner(tk.Tk):
                     treewidget.insert(country_code, 'end',
                                       sector_code, text=sector_obj.Code,
                                       open=False)
-                    variables_on_tree = treewidget.get_children(sector_code)
-                    variables = sector_obj.EquationBlock.GetEquationList()
-                    variable_lookup = {}
-                    for var in variables:
-                        variable_lookup[sector_code+'*'+var] = sector_obj.EquationBlock[var]
-                    for var_code in variables_on_tree:
-                        if var_code not in variable_lookup:
-                            treewidget.delete(var_code)
-                    for var_code in variable_lookup.keys():
-                        eqn = variable_lookup[var_code]
-                        eqn_str = "{0} = {1}".format(eqn.LeftHandSide, eqn.GetRightHandSide())
-                        if var_code not in variables_on_tree:
-                            treewidget.insert(sector_code, 'end', var_code,
-                                              text=eqn.LeftHandSide,
-                                              values=(eqn_str, eqn.Description))
-                        else:
-                            treewidget.set(var_code, values=(eqn_str, eqn.Description))
-        print(treewidget.get_children())
+                variables_on_tree = treewidget.get_children(sector_code)
+                variables = sector_obj.EquationBlock.GetEquationList()
+                variable_lookup = {}
+                for var in variables:
+                    variable_lookup[sector_code+'*'+var] = sector_obj.EquationBlock[var]
+                for var_code in variables_on_tree:
+                    if var_code not in variable_lookup:
+                        treewidget.delete(var_code)
+                for var_code in variable_lookup.keys():
+                    eqn = variable_lookup[var_code]
+                    rhs = eqn.GetRightHandSide()
+                    eqn_str = "{0} = {1}".format(eqn.LeftHandSide, rhs)
+                    if not sector_obj.FullCode == '':
+                        fullname = sector_obj.GetVariableName(eqn.LeftHandSide)
+                        self.CurrentEquations.append(
+                            (fullname, '{0} = {1}'.format(fullname, rhs), eqn.Description))
+                    if var_code not in variables_on_tree:
+                        treewidget.insert(sector_code, 'end', var_code,
+                                          text=eqn.LeftHandSide,
+                                          values=(eqn_str, eqn.Description))
+                    else:
+                        treewidget.item(var_code, values=(eqn_str, eqn.Description))
+        self.CurrentEquations.sort()
+        changed_equations = []
+        for x in self.CurrentEquations:
+            if x not in self.PreviousEquations:
+                changed_equations.append(x)
+        self.WidgetsModelViewer.DeleteTreeChildren('equations', 'CHANGED*EQUATIONS')
+        for varname, eqn_str, desc in changed_equations:
+            treewidget.insert('CHANGED*EQUATIONS', 'end','C*'+varname, text=varname, values=(eqn_str, desc))
+        on_tree = treewidget.get_children('SECTOR*EQUATIONS')
+        for pos in range(0, len(self.CurrentEquations)):
+            varname, eqn_str, desc = self.CurrentEquations[pos]
+            ccode = 'S*' + varname
+            if ccode in on_tree:
+                treewidget.item(ccode, values=(eqn_str, desc))
+            else:
+                treewidget.insert('SECTOR*EQUATIONS', pos, text=varname,
+                                  values=(eqn_str, desc))
+
         # country_list = [self.WidgetsModelViewer.Data['parameter_final_equation'],]
         # for c in self.Model.CountryList:
         #     country_list.append(c.Code)
