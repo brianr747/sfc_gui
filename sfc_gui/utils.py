@@ -79,8 +79,8 @@ class Parameters(object):
         if self.TimeAxisVariable not in holder:
             holder[self.TimeAxisVariable] = [0.0, 1.0]
         self.TimeAxisMinimum = int(self.GetTimeSeries(self.TimeAxisVariable)[0])
-        self.TimeRange = None
-        self.TimeStart = self.TimeAxisMinimum
+        self.TimeRange = 40 # None
+        self.TimeStart = 1 # self.TimeAxisMinimum
         self.TimeSeriesList = holder.GetSeriesList()
         self.LastSource = opt
         return holder
@@ -142,6 +142,20 @@ class WidgetHolder(object):
                 return mlist[indices[0]]
         else:
             return [mlist[x[0]] for x in indices]
+
+    def SetListBox(self, name, value):
+        if type(value) == str:
+            if value == '':
+                value = []
+            else:
+                value = [value,]
+        used = tuple(value)
+        # used = value
+        # if len(value) == 0:
+        #     used = ''
+        # elif len(value) == 1:
+        #     used = value[0]
+        self.Data[name].set(used)
 
     def DeleteTreeChildren(self, name, item_code):
         treewidget = self.Widgets[name]

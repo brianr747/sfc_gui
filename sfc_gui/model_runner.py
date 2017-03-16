@@ -298,7 +298,7 @@ class ModelRunner(tk.Tk):
         if len(steps) == 0:
             self.WidgetsModelViewer.Data['possible_steps'].set('')
         else:
-            self.WidgetsModelViewer.Data['possible_steps'].set(steps[0])
+            self.WidgetsModelViewer.SetListBox('possible_steps', steps[0])
         if len(steps) == 0:
             next_step = ''
         else:
@@ -452,7 +452,7 @@ class ModelRunner(tk.Tk):
                 continue
             f = f[:-3]
             acceptable.append(f)
-        self.WidgetsChooser.Data['models'].set(acceptable)
+        self.WidgetsChooser.SetListBox('models', acceptable)
 
     def Importer(self, name):
         if type(name) is not str:

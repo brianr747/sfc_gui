@@ -369,7 +369,7 @@ class ChartPlotterFrame(ttk.Frame):
         self.UpdateEquationList()
 
     def UpdateEquationList(self):
-        self.WidgetHolder.Data['equationlist'].set(value=self.Parameters.TimeSeriesList)
+        self.WidgetHolder.SetListBox('equationlist', self.Parameters.TimeSeriesList)
 
     def Update(self):
         # Do the cutoff inside the GUI, as we may switch to alternative
