@@ -21,6 +21,7 @@ limitations under the License.
 
 import copy
 import sys
+import traceback
 import matplotlib
 matplotlib.use('TKagg')
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
@@ -32,10 +33,12 @@ from sfc_models.models import Model
 if sys.version_info[0] < 3:
     import Tkinter as tk
     from Tkinter import *
+    from Tkinter import messagebox
     from Tkinter import ttk
 else:
     import tkinter as tk
     from tkinter import *
+    from tkinter import messagebox
     from tkinter import ttk
 
 class Parameters(object):
@@ -230,3 +233,6 @@ def get_series_info(series_name, mod):
         desc = 'Fitting error for equations at each iteration of the solver.'
     return eqn_str, desc
 
+def ErrorDialog(ex):
+    msg = "Error: {0}\n\n{1}".format(str(ex), ''.join(traceback.format_exc(limit=4)))
+    messagebox.showinfo(message=msg, icon='error', title='Error')

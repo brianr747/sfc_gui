@@ -18,11 +18,13 @@ from sfc_gui.utils import WidgetHolder, Parameters
 if sys.version_info[0] < 3:
     import Tkinter as tk
     from Tkinter import *
+    from Tkinter import messagebox
     from Tkinter import ttk
     import Tkinter.filedialog as fdog
 else:
     import tkinter as tk
     from tkinter import *
+    from tkinter import messagebox
     from tkinter import ttk
     import tkinter.filedialog as fdog
 
@@ -124,8 +126,10 @@ class ModelRunner(tk.Tk):
         inner_frame = ttk.Frame(frame, borderwidth=5, relief='sunken', width=self.MinWidth,
                           height=self.MinHeight)
 
-        widgetholder.AddVariableLabel(frame, 'model_name')
-        widgetholder.AddVariableLabel(frame, 'model_state')
+        top_frame = ttk.Frame(frame, borderwidth=5, relief='sunken' )
+        widgetholder.AddVariableLabel(top_frame, 'model_name')
+        widgetholder.AddVariableLabel(top_frame, 'model_state')
+        widgetholder.AddVariableLabel(top_frame, 'num_sector_eqn')
         widgetholder.AddButton(frame, 'back', text='Back', command=self.OnModelViewerBack)
         # widgetholder.AddListBox(frame, 'country', height=5, callback=self.OnChangeCountry)
         widgetholder.AddButton(frame, 'fullcodes', 'Generate\nFullCodes',
@@ -140,14 +144,20 @@ class ModelRunner(tk.Tk):
         scrolly = ttk.Scrollbar(frame, orient=VERTICAL,
                                 command=self.WidgetsModelViewer.Widgets['equations'].yview)
         self.WidgetsModelViewer.Widgets['equations']['yscrollcommand'] = scrolly.set
+        label_name = ttk.Label(top_frame, text='Model Name: ')
+        label_state = ttk.Label(top_frame, text="State: ")
+        label_num_sector = ttk.Label(top_frame, text='# of Sector Equations')
         # Gridding
         frame.grid(row=0, column=0,  sticky=('N', 'S', 'E', 'W'))
-        label_name = ttk.Label(frame, text='Model Name: ')
-        label_name.grid(row=0, column=0, sticky=('E',))
-        self.WidgetsModelViewer.Widgets['model_name'].grid(row=0, column=1,sticky=('W',))
-        label_state = ttk.Label(frame, text="State: ")
+        # Top Grid
+        top_frame.grid(row=0, column = 0, columnspan=5, sticky=('W',))
+        label_name.grid(row=0, column=0)
+        self.WidgetsModelViewer.Widgets['model_name'].grid(row=0, column=1, padx=5)
         label_state.grid(row=0, column=2, sticky=('E'))
-        self.WidgetsModelViewer.Widgets['model_state'].grid(row=0, column=3, sticky=('W',))
+        self.WidgetsModelViewer.Widgets['model_state'].grid(row=0, column=3, padx=5)
+        label_num_sector.grid(row=1, column=0, padx=5)
+        self.WidgetsModelViewer.Widgets['num_sector_eqn'].grid(row=1, column=1, padx=5)
+
         self.WidgetsModelViewer.Widgets['back'].grid(row=0, column=4, sticky=('E'))
         self.WidgetsModelViewer.Widgets['equations'].grid(row=1, column=0, columnspan=5,
                                                           rowspan=5, sticky=('N', 'S', 'W', 'E'))
@@ -195,11 +205,24 @@ class ModelRunner(tk.Tk):
             next_step = self.WidgetsModelViewer.GetListBox('possible_steps')
             if next_step is None:
                 next_step = steps[0][0]
-        self.Model._RunStep(next_step)
+        try:
+            self.Model._RunStep(next_step)
+        except Exception as e:
+            self.Model.LogInfo(ex=e)
+            sfc_gui.utils.ErrorDialog(e)
+            self.UpdateModelViewer()
+            # messagebox.showinfo(message=str(e), icon='error', title='Error')
+            raise e
         self.UpdateModelViewer()
 
     def OnRunAll(self):
-        self.Model._RunAllSteps()
+        try:
+            self.Model._RunAllSteps()
+        except Exception as e:
+            sfc_gui.utils.ErrorDialog(e) #messagebox.showinfo(message=str(e), icon='error', title='Error')
+            self.Model.LogInfo(ex=e)
+            self.UpdateModelViewer()
+            raise e
         self.UpdateModelViewer()
 
     def OnShowGraph(self):
@@ -241,7 +264,11 @@ class ModelRunner(tk.Tk):
             base_name = os.path.join(self.Parameters.LogDir, name)
             Logger.register_standard_logs(base_file_name=base_name)
         python_mod = self.Importer(name)
-        self.Model = python_mod.build_model()
+        try:
+            self.Model = python_mod.build_model()
+        except Exception as e:
+            messagebox.showinfo(message=str(e), icon='error', title='Error')
+            raise e
         if type(self.Model) is not Model:
             raise ValueError('Expected a Model, got {0} instead'.format(type(Model)))
         self.Sectors = self.Model.GetSectors()
@@ -304,6 +331,7 @@ class ModelRunner(tk.Tk):
             treewidget.insert(final_name, 'end', varname,
                               text=eqn.LeftHandSide,
                               values=(eqn_str, eqn.Description))
+        num_sector_equations = 0
         for country_obj in self.Model.CountryList:
             country_code = country_obj.Code
             if country_obj.Code not in on_tree:
@@ -332,6 +360,7 @@ class ModelRunner(tk.Tk):
                     if var_code not in variable_lookup:
                         treewidget.delete(var_code)
                 for var_code in variable_lookup.keys():
+                    num_sector_equations += 1
                     eqn = variable_lookup[var_code]
                     rhs = eqn.GetRightHandSide()
                     eqn_str = "{0} = {1}".format(eqn.LeftHandSide, rhs)
@@ -345,6 +374,7 @@ class ModelRunner(tk.Tk):
                                           values=(eqn_str, eqn.Description))
                     else:
                         treewidget.item(var_code, values=(eqn_str, eqn.Description))
+        self.WidgetsModelViewer.Data['num_sector_eqn'].set(str(num_sector_equations))
         self.CurrentEquations.sort()
         changed_equations = []
         for x in self.CurrentEquations:
