@@ -130,6 +130,7 @@ class ModelRunner(tk.Tk):
         widgetholder.AddVariableLabel(top_frame, 'model_name')
         widgetholder.AddVariableLabel(top_frame, 'model_state')
         widgetholder.AddVariableLabel(top_frame, 'num_sector_eqn')
+        widgetholder.AddVariableLabel(top_frame, 'num_final_eqn')
         widgetholder.AddButton(frame, 'back', text='Back', command=self.OnModelViewerBack)
         # widgetholder.AddListBox(frame, 'country', height=5, callback=self.OnChangeCountry)
         widgetholder.AddButton(frame, 'fullcodes', 'Generate\nFullCodes',
@@ -147,6 +148,7 @@ class ModelRunner(tk.Tk):
         label_name = ttk.Label(top_frame, text='Model Name: ')
         label_state = ttk.Label(top_frame, text="State: ")
         label_num_sector = ttk.Label(top_frame, text='# of Sector Equations')
+        label_num_final = ttk.Label(top_frame, text='# of Final Equations')
         # Gridding
         frame.grid(row=0, column=0,  sticky=('N', 'S', 'E', 'W'))
         # Top Grid
@@ -155,9 +157,10 @@ class ModelRunner(tk.Tk):
         self.WidgetsModelViewer.Widgets['model_name'].grid(row=0, column=1, padx=5)
         label_state.grid(row=0, column=2, sticky=('E'))
         self.WidgetsModelViewer.Widgets['model_state'].grid(row=0, column=3, padx=5)
-        label_num_sector.grid(row=1, column=0, padx=5)
-        self.WidgetsModelViewer.Widgets['num_sector_eqn'].grid(row=1, column=1, padx=5)
-
+        label_num_sector.grid(row=1, column=0)
+        self.WidgetsModelViewer.Widgets['num_sector_eqn'].grid(row=1, column=1, padx=5, sticky=('W',))
+        label_num_final.grid(row=1, column=2)
+        self.WidgetsModelViewer.Widgets['num_final_eqn'].grid(row=1, column=3, padx=5, sticky=('W',))
         self.WidgetsModelViewer.Widgets['back'].grid(row=0, column=4, sticky=('E'))
         self.WidgetsModelViewer.Widgets['equations'].grid(row=1, column=0, columnspan=5,
                                                           rowspan=5, sticky=('N', 'S', 'W', 'E'))
@@ -325,12 +328,15 @@ class ModelRunner(tk.Tk):
         if 'CHANGED*EQUATIONS' not in on_tree:
             treewidget.insert('', 'end', 'CHANGED*EQUATIONS', text='Changed Equations', open=False)
         self.WidgetsModelViewer.DeleteTreeChildren('equations', final_name)
+        num_final = 0
         for varname in self.Model.FinalEquationBlock.GetEquationList():
+            num_final += 1
             eqn = self.Model.FinalEquationBlock[varname]
             eqn_str = '{0} = {1}'.format(varname, eqn.GetRightHandSide())
             treewidget.insert(final_name, 'end', varname,
                               text=eqn.LeftHandSide,
                               values=(eqn_str, eqn.Description))
+        self.WidgetsModelViewer.Data['num_final_eqn'].set(str(num_final))
         num_sector_equations = 0
         for country_obj in self.Model.CountryList:
             country_code = country_obj.Code
