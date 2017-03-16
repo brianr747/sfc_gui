@@ -21,25 +21,81 @@ limitations under the License.
 
 import copy
 import sys
+import traceback
 import matplotlib
 matplotlib.use('TKagg')
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 from matplotlib.figure import Figure
 import matplotlib.pyplot
 
+from sfc_models.models import Model
+
 if sys.version_info[0] < 3:
     import Tkinter as tk
     from Tkinter import *
+    from Tkinter import messagebox
     from Tkinter import ttk
 else:
     import tkinter as tk
     from tkinter import *
+    from tkinter import messagebox
     from tkinter import ttk
+
+class Parameters(object):
+    """
+    Class to hold common data members that are shared by multiple frame objects.
+    Not all Frames will use all data.
+    """
+    def __init__(self):
+        self.Model = Model()
+        self.ModelName = ''
+        self.TimeSeriesHolder = self.Model.EquationSolver.TimeSeries
+        self.TimeAxisVariable = 'k'
+        self.MinWidth = 800
+        self.MinHeight = 600
+        self.LogDir = ''
+        self.SourceOptions = ('Time Series', 'Initial Steady State', 'Convergence Trace')
+        self.LastSource = ''
+
+    def SetModel(self, model):
+        self.Model = model
+        self.LastSource = ''
+        self.SetTimeSeriesHolder()
+
+    def SetTimeSeriesHolder(self, source_str='Time Series'):
+        opt = source_str
+        if opt not in self.SourceOptions:
+            raise ValueError('Unknown time series source: ' + opt)
+        if opt == self.LastSource:
+            return
+        if opt == self.SourceOptions[0]:
+            holder = self.Model.EquationSolver.TimeSeries
+        if opt == self.SourceOptions[1]:
+            holder = self.Model.EquationSolver.TimeSeriesInitialSteadyState
+        if opt == self.SourceOptions[2]:
+            holder = self.Model.EquationSolver.TimeSeriesStepTrace
+        self.TimeSeriesHolder = holder
+        self.TimeAxisVariable = self.TimeSeriesHolder.TimeSeriesName
+        if self.TimeAxisVariable not in holder:
+            holder[self.TimeAxisVariable] = [0.0, 1.0]
+        self.TimeAxisMinimum = int(self.GetTimeSeries(self.TimeAxisVariable)[0])
+        self.TimeRange = None
+        self.TimeStart = self.TimeAxisMinimum
+        self.TimeSeriesList = holder.GetSeriesList()
+        self.LastSource = opt
+        return holder
+
+    def GetTimeSeries(self, series_name):
+        ser = self.TimeSeriesHolder[series_name]
+        return ser
+
+
 
 class WidgetHolder(object):
     def __init__(self):
         self.Widgets = {}
         self.Data = {}
+        self.ListBoxType = {}
         self.MatplotlibInfo = {}
 
     def AddEntry(self, parent, name, readonly=False):
@@ -49,9 +105,52 @@ class WidgetHolder(object):
         else:
             self.Widgets[name] = Entry(parent, textvariable=self.Data[name])
 
-    def AddListBox(self, parent, name, height=10):
+    def AddButton(self, parent, name, text, command, state='!disabled'):
+        self.Widgets[name] = ttk.Button(parent, text=text, command=command, state=state)
+
+    def AddTree(self, parent, name, columns):
+        self.Widgets[name] = ttk.Treeview(parent, columns=columns)
+
+    def AddListBox(self, parent, name, height=10, single_select=True, callback=None):
+        if single_select:
+            select_mode = 'browse'
+        else:
+            select_mode='extended'
+        self.ListBoxType[name] = select_mode
         self.Data[name] = StringVar()
-        self.Widgets[name] = Listbox(parent, listvariable=self.Data[name], height=height)
+        self.Widgets[name] = Listbox(parent, listvariable=self.Data[name], height=height,
+                                     selectmode=select_mode)
+        if callback is not None:
+            self.Widgets[name].bind('<<ListboxSelect>>', callback)
+
+    def GetListBox(self, name):
+        """
+        If single_select: returns string or None (no selection).
+
+        If multi-select, always returns a list of strings (possibly empty).
+
+        :param name:
+        :return:
+        """
+        indices = self.Widgets[name].curselection()
+        mlist =  self.Data[name].get()
+        mlist = eval(mlist)
+        if self.ListBoxType[name] == 'browse':
+            if len(indices) == 0:
+                return None
+            else:
+                return mlist[indices[0]]
+        else:
+            return [mlist[x[0]] for x in indices]
+
+    def DeleteTreeChildren(self, name, item_code):
+        treewidget = self.Widgets[name]
+        children = treewidget.get_children(item_code)
+        for child in children:
+            treewidget.delete(child)
+
+
+
 
     def AddMatplotLib(self, parent, name):
         Fig = matplotlib.figure.Figure(figsize=(7.5, 5), dpi=90)
@@ -67,6 +166,10 @@ class WidgetHolder(object):
         for opt in options:
             widgies.append(ttk.Radiobutton(parent, text=opt, variable=self.Data[name], value=opt))
         self.Widgets[name] = widgies
+
+    def AddVariableLabel(self, parent, name):
+        self.Data[name] = StringVar()
+        self.Widgets[name] = tk.Label(parent, textvariable=self.Data[name])
 
     def GetMatplotlibInfo(self, name, objectname):
         if not objectname in ('line', 'canvas'):
@@ -130,3 +233,6 @@ def get_series_info(series_name, mod):
         desc = 'Fitting error for equations at each iteration of the solver.'
     return eqn_str, desc
 
+def ErrorDialog(ex):
+    msg = "Error: {0}\n\n{1}".format(str(ex), ''.join(traceback.format_exc(limit=4)))
+    messagebox.showinfo(message=msg, icon='error', title='Error')
