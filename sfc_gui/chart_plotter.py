@@ -347,13 +347,13 @@ class ChartPlotterFrame(ttk.Frame):
         widgetholder = self.WidgetHolder
         widgetholder.AddButton(self, 'closer', 'Close', command=self.OnClose)
         widgetholder.AddListBox(self, 'equationlist', height=30)
-        button = ttk.Button(self, text='Settings', command=self.OnSettingsCallback)
+        button = ttk.Button(self, text='Settings', command=self.OnSettings)
         widgetholder.AddEntry(self, 'equation', readonly=True)
         widgetholder.AddEntry(self, 'description', readonly=True)
         widgetholder.AddMatplotLib(self, 'graph')
         widgetholder.Widgets['equationlist'].bind('<<ListboxSelect>>', self.OnListEvent)
         # Gridding
-        self.grid(column=0, row=0)
+        self.grid(column=0, row=0, sticky=('N', 'S', 'E', 'W'))
         inner_frame.grid(row=0, column=0, rowspan=5, columnspan=3, sticky=('N', 'S', 'E', 'W'))
         widgetholder.Widgets['equationlist'].grid(row=0, column=0, columnspan=1, rowspan=3, sticky=['n', 'w', 'e', 'S'])
         button.grid(column=5, row=0)
@@ -398,10 +398,12 @@ class ChartPlotterFrame(ttk.Frame):
         canvas = self.WidgetHolder.GetMatplotlibInfo('graph', 'canvas')
         ax = canvas.figure.gca()
         ax.set_xlim(min(x), max(x)+1)
-        ax.set_ylim(min(y) - 1, max(y) + 1)
+        ax.set_ylim(min(y), max(y) + .1)
         ax.set_xlabel(self.Parameters.TimeAxisVariable)
         canvas.draw()
 
+    def OnSettings(self):
+        self.OnSettingsCallback()
 
     def OnSettings_Stub(self):
         print('Must set self.OnSettingsCallback')
@@ -413,6 +415,83 @@ class ChartPlotterFrame(ttk.Frame):
         self.destroy()
 
 
+class SettingsWindow(ttk.Frame):
+    def __init__(self, parent, parameters=None):
+        ttk.Frame.__init__(self, parent)
+        self.Parameters = utils.Parameters()
+        self.OnCloseCallback = self.CloseStub
+        self.SourceOptions = ('cat', 'dog')
+        if parameters is not None:
+            self.Parameters = parameters
+
+        self.WidgetHolder = WidgetHolder()
+        frame = ttk.Frame(self, borderwidth=5, relief='sunken',
+                                width=self.Parameters.MinWidth,
+                                height=self.Parameters.MinHeight)
+        widgetholder = self.WidgetHolder
+
+        button = ttk.Button(self, text='Apply', command=self.OnSettingsApply)
+        button2 = ttk.Button(self, text='Cancel',
+                            command=self.OnSettingsBack)
+        widgetholder.AddVariableLabel(self, 'range')
+        widgetholder.AddVariableLabel(self, 'startlabel')
+        widgetholder.Data['startlabel'].set('Start')
+        widgetholder.Data['range'].set('Time Series Range Limit [{0}]'.format(self.Parameters.TimeAxisVariable))
+
+        widgetholder.AddEntry(self, 'cutoff')
+        widgetholder.Data['cutoff'].set(self.Parameters.TimeRange)
+        # label_start = tk.Label(frame, text='Time Series Start [{0}]'.format(self.TimeAxisVariable))
+        widgetholder.AddEntry(self, 'start')
+        widgetholder.Data['start'].set(self.Parameters.TimeStart)
+        widgetholder.AddRadioButtons(self, 'source', self.SourceOptions)
+        widgetholder.Data['source'].set(self.SourceOptions[0])
+        buttonrow = 5
+        self.grid(row=0, column=0, sticky=('N', 'W'))
+        frame.grid(row=0, column=0, columnspan=5, rowspan=5, sticky=('N', 'W'))
+        button.grid(row=buttonrow, column=2)
+        button2.grid(row=buttonrow, column=0)
+        widgetholder.Widgets['range'].grid(row=0, column=0, columnspan=3)
+        widgetholder.Widgets['cutoff'].grid(row=1, column=0, columnspan=3)
+        widgetholder.Widgets['startlabel'].grid(row=2, column=0, columnspan=3)
+        widgetholder.Widgets['start'].grid(row=3, column=0, columnspan=3)
+        widgies = widgetholder.Widgets['source']
+        for i in range(0, len(widgies)):
+            widgies[i].grid(row=4, column=i)
+
+        #self.columnconfigure(2, weight=1)
+        #self.columnconfigure(3, weight=1)
+        #self.columnconfigure(4, weight=1)
+        #self.rowconfigure(2, weight=1)
+
+    def OnSettingsApply(self):
+        start = self.WidgetHolder.Data['start'].get()
+        try:
+            start_n = utils.get_int(start, accept_None=True)
+        except:
+            return
+        if start_n is None:
+            self.Parameters.TimeStart = self.Parameters.TimeAxisMinimum
+        else:
+            self.Parameters.TimeStart = max(start_n, self.Parameters.TimeAxisMinimum)
+        val = self.WidgetHolder.Data['cutoff'].get()
+        try:
+            val_n = utils.get_int(val)
+        except:
+            return
+        if val_n is None:
+            self.Parameters.TimeRange = None
+        elif val_n < 1:
+            return
+        else:
+            self.Parameters.TimeRange = val_n
+        self.destroy()
+        self.OnCloseCallback()
+
+    def OnSettingsBack(self):
+        self.destroy()
+
+    def CloseStub(self):
+        print('Must set the OnCloseCallback() to call update')
 
 
 

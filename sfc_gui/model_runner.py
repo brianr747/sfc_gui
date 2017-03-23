@@ -231,7 +231,16 @@ class ModelRunner(tk.Tk):
     def OnShowGraph(self):
         self.Parameters.SetModel(self.Model)
         self.FramePlotter = sfc_gui.chart_plotter.ChartPlotterFrame(self, parameters=self.Parameters)
+        self.FramePlotter.OnSettingsCallback = self.ShowSettings
         self.FramePlotter.tkraise()
+
+    def ShowSettings(self):
+        settings = sfc_gui.chart_plotter.SettingsWindow(self, parameters=self.Parameters)
+        settings.OnCloseCallback = self.OnSettingsClose
+        settings.tkraise()
+
+    def OnSettingsClose(self):
+        self.FramePlotter.Update()
 
     def OnGenerateFullCodes(self):
         self.Model._GenerateFullSectorCodes()

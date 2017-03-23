@@ -56,6 +56,9 @@ class Parameters(object):
         self.LogDir = ''
         self.SourceOptions = ('Time Series', 'Initial Steady State', 'Convergence Trace')
         self.LastSource = ''
+        self.TimeAxisMinimum = None
+        self.TimeStart = None
+        self.TimeRange = None
 
     def SetModel(self, model):
         self.Model = model
@@ -80,7 +83,7 @@ class Parameters(object):
             holder[self.TimeAxisVariable] = [0.0, 1.0]
         self.TimeAxisMinimum = int(self.GetTimeSeries(self.TimeAxisVariable)[0])
         self.TimeRange = 40 # None
-        self.TimeStart = 1 # self.TimeAxisMinimum
+        self.TimeStart = self.TimeAxisMinimum
         self.TimeSeriesList = holder.GetSeriesList()
         self.LastSource = opt
         return holder
