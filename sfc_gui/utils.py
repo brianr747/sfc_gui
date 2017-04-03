@@ -56,6 +56,7 @@ class Parameters(object):
         self.LogDir = ''
         self.SourceOptions = ('Time Series', 'Initial Steady State', 'Convergence Trace')
         self.LastSource = ''
+        self.TimeSeriesWidget = None
         self.TimeAxisMinimum = None
         self.TimeStart = None
         self.TimeRange = None
@@ -85,6 +86,8 @@ class Parameters(object):
         self.TimeRange = 40 # None
         self.TimeStart = self.TimeAxisMinimum
         self.TimeSeriesList = holder.GetSeriesList()
+        if self.TimeSeriesWidget is not None:
+            self.TimeSeriesWidget.set(self.TimeSeriesList)
         self.LastSource = opt
         return holder
 

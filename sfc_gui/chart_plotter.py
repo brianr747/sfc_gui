@@ -352,6 +352,8 @@ class ChartPlotterFrame(ttk.Frame):
         widgetholder.AddEntry(self, 'description', readonly=True)
         widgetholder.AddMatplotLib(self, 'graph')
         widgetholder.Widgets['equationlist'].bind('<<ListboxSelect>>', self.OnListEvent)
+        # Need to give the Parameters object the equationlist widget
+        self.Parameters.TimeSeriesWidget = widgetholder.Data['equationlist']
         # Gridding
         self.grid(column=0, row=0, sticky=('N', 'S', 'E', 'W'))
         inner_frame.grid(row=0, column=0, rowspan=5, columnspan=3, sticky=('N', 'S', 'E', 'W'))
@@ -420,7 +422,7 @@ class SettingsWindow(ttk.Frame):
         ttk.Frame.__init__(self, parent)
         self.Parameters = utils.Parameters()
         self.OnCloseCallback = self.CloseStub
-        self.SourceOptions = ('cat', 'dog')
+        # self.SourceOptions = self.Parameters.SourceOptions
         if parameters is not None:
             self.Parameters = parameters
 
@@ -443,8 +445,8 @@ class SettingsWindow(ttk.Frame):
         # label_start = tk.Label(frame, text='Time Series Start [{0}]'.format(self.TimeAxisVariable))
         widgetholder.AddEntry(self, 'start')
         widgetholder.Data['start'].set(self.Parameters.TimeStart)
-        widgetholder.AddRadioButtons(self, 'source', self.SourceOptions)
-        widgetholder.Data['source'].set(self.SourceOptions[0])
+        widgetholder.AddRadioButtons(self, 'source', self.Parameters.SourceOptions)
+        widgetholder.Data['source'].set(self.Parameters.LastSource)
         buttonrow = 5
         self.grid(row=0, column=0, sticky=('N', 'W'))
         frame.grid(row=0, column=0, columnspan=5, rowspan=5, sticky=('N', 'W'))
@@ -484,6 +486,8 @@ class SettingsWindow(ttk.Frame):
             return
         else:
             self.Parameters.TimeRange = val_n
+        source = self.WidgetHolder.Data['source'].get()
+        self.Parameters.SetTimeSeriesHolder(source)
         self.destroy()
         self.OnCloseCallback()
 
